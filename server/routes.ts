@@ -2,12 +2,13 @@ import { ObjectId } from "mongodb";
 
 import { Router, getExpressRouter } from "./framework/router";
 
-import { Authing, Friending, Posting, Sessioning } from "./app";
+import { Authing, Friending, Posting, Sessioning, Tasking } from "./app";
 import { PostOptions } from "./concepts/posting";
 import { SessionDoc } from "./concepts/sessioning";
 import Responses from "./responses";
 
 import { z } from "zod";
+import { TaskStatus } from "./concepts/tasksetting";
 
 /**
  * Web server routes for the app. Implements synchronizations between concepts.
@@ -151,6 +152,38 @@ class Routes {
     const user = Sessioning.getUser(session);
     const fromOid = (await Authing.getUserByUsername(from))._id;
     return await Friending.rejectRequest(fromOid, user);
+  }
+
+  // Routes for the user's tasks
+
+  @Router.get("/tasks")
+  @Router.validate(z.object({ title: z.string().min(1), description: z.string().min(1) }))
+  async getTasks() {
+    const tasks = Tasking.getTasks();
+    return await tasks;
+  }
+
+  @Router.post("/tasks")
+  async createTask(session: SessionDoc, title: string, description: string, status: TaskStatus) {
+    const user = Sessioning.getUser(session);
+    const task = await Tasking.create(user, title, description);
+    return { msg: task.msg, task: await task.task };
+  }
+
+  @Router.patch("/tasks/:id")
+  async updateTask(session: SessionDoc, id: string, title?: string, description?: string, status?: TaskStatus) {
+    const user = Sessioning.getUser(session);
+    const oid = new ObjectId(id);
+    await Tasking.assertAuthorIsUser(user, oid);
+    return await Tasking.update(oid, title, description, status);
+  }
+
+  @Router.delete("/tasks/:id")
+  async deleteTask(session: SessionDoc, id: string) {
+    const user = Sessioning.getUser(session);
+    const oid = new ObjectId(id);
+    await Tasking.assertAuthorIsUser(user, oid);
+    return await Tasking.delete(oid);
   }
 }
 
