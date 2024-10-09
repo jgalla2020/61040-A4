@@ -1,6 +1,8 @@
+import { ObjectId } from "mongodb";
 import DocCollection, { BaseDoc } from "../framework/doc";
 
 export interface ProfileDoc extends BaseDoc {
+  author: ObjectId;
   name: string;
   contact?: string;
   bio?: string;
@@ -24,6 +26,10 @@ export default class ProfilingConcept {
   }
 
   async view() {
+    //
+  }
+
+  async delete() {
     //
   }
 
