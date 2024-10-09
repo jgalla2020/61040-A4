@@ -158,13 +158,21 @@ class Routes {
 
   @Router.get("/tasks")
   @Router.validate(z.object({ title: z.string().min(1), description: z.string().min(1) }))
-  async getTasks() {
-    const tasks = Tasking.getTasks();
-    return await tasks;
+  async getTasks(author?: string) {
+    let tasks;
+
+    if (author) {
+      const id = (await Authing.getUserByUsername(author))._id;
+      tasks = await Tasking.getByAuthor(id);
+    } else {
+      tasks = await Tasking.getTasks();
+    }
+
+    return tasks;
   }
 
   @Router.post("/tasks")
-  async createTask(session: SessionDoc, title: string, description: string, status: TaskStatus) {
+  async createTask(session: SessionDoc, title: string, description: string) {
     const user = Sessioning.getUser(session);
     const task = await Tasking.create(user, title, description);
     return { msg: task.msg, task: await task.task };
@@ -174,7 +182,7 @@ class Routes {
   async updateTask(session: SessionDoc, id: string, title?: string, description?: string, status?: TaskStatus) {
     const user = Sessioning.getUser(session);
     const oid = new ObjectId(id);
-    await Tasking.assertAuthorIsUser(user, oid);
+    await Tasking.assertAuthorIsUser(oid, user);
     return await Tasking.update(oid, title, description, status);
   }
 
@@ -182,7 +190,7 @@ class Routes {
   async deleteTask(session: SessionDoc, id: string) {
     const user = Sessioning.getUser(session);
     const oid = new ObjectId(id);
-    await Tasking.assertAuthorIsUser(user, oid);
+    await Tasking.assertAuthorIsUser(oid, user);
     return await Tasking.delete(oid);
   }
 }
