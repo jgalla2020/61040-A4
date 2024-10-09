@@ -15,7 +15,7 @@ export interface TaskDoc extends BaseDoc {
 /**
  * concept: TaskSetting
  */
-export default class TasksettingConcept {
+export default class TaskingConcept {
   public readonly tasks: DocCollection<TaskDoc>;
 
   /**
