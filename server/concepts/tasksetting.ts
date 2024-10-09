@@ -43,7 +43,7 @@ export default class TasksettingConcept {
 
   async update(_id: ObjectId, title?: string, description?: string, status?: TaskStatus) {
     await this.tasks.partialUpdateOne({ _id }, { title, description, status });
-    return { msg: "Task updated successfully!" };
+    return { msg: "Task updated successfully!", task: await this.tasks.readOne({ _id }) };
   }
 
   async delete(_id: ObjectId) {
@@ -54,7 +54,7 @@ export default class TasksettingConcept {
   async assertAuthorIsUser(_id: ObjectId, user: ObjectId) {
     const task = await this.tasks.readOne({ _id });
     if (!task) {
-      throw new NotFoundError(`Post ${_id} does not exist!`);
+      throw new NotFoundError(`Task ${_id} does not exist!`);
     }
     if (task.author.toString() !== user.toString()) {
       throw new TaskAuthorNotMatchError(user, _id);
