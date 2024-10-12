@@ -80,9 +80,46 @@ const operations: Operation[] = [
     method: "DELETE",
     fields: { id: "input" },
   },
-  //
-  // ...
-  //
+
+  // Testing Task Operations
+
+  {
+    name: "Create Task",
+    endpoint: "/api/tasks",
+    method: "POST",
+    fields: { title: "input", description: "textarea" },
+  },
+
+  {
+    name: "Get Tasks",
+    endpoint: "/api/tasks",
+    method: "GET",
+    fields: { author: "input" },
+  },
+
+  {
+    name: "Update Task",
+    endpoint: "/api/tasks/:id",
+    method: "PATCH",
+    fields: { id: "input", title: "input", description: "textarea", status: "input" },
+  },
+
+  {
+    name: "Delete Task",
+    endpoint: "/api/tasks/:id",
+    method: "DELETE",
+    fields: { id: "input" },
+  },
+
+  // Testing Tracking Routes
+
+  // Testing Profile Routes
+
+  // Testing Sharing Routes
+
+  // Testing Messaging Routes
+
+  // Testing Preferences Routes
 ];
 
 /*
