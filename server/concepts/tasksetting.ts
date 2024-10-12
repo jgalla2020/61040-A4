@@ -72,7 +72,24 @@ export default class TaskingConcept {
    * @returns an object containing a success message and the updated task details.
    */
   async update(_id: ObjectId, title?: string, description?: string, status?: TaskStatus) {
-    await this.tasks.partialUpdateOne({ _id }, { title, description, status });
+    const task = await this.tasks.readOne({ _id });
+
+    if (!task) {
+      throw new NotFoundError(`Task ${_id} does not exist!`);
+    }
+
+    // For fields not provided, keep existing fields.
+    const updateFields: Partial<{ title: string; description: string; status: TaskStatus }> = {
+      title: title,
+      description: description,
+      status: status,
+    };
+
+    if (updateFields.title === undefined) updateFields.title = task.title;
+    if (updateFields.description === undefined) updateFields.description = task.description;
+    if (updateFields.status === undefined) updateFields.status = task.status;
+
+    await this.tasks.partialUpdateOne({ _id }, updateFields);
     return { msg: "Task updated successfully!", task: await this.tasks.readOne({ _id }) };
   }
 
