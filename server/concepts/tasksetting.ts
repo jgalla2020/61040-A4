@@ -3,7 +3,9 @@ import { ObjectId } from "mongodb";
 import DocCollection, { BaseDoc } from "../framework/doc";
 import { BadValuesError, NotAllowedError, NotFoundError } from "./errors";
 
-export type TaskStatus = "complete" | "in-progress";
+const STATUS_TYPES = ["complete", "in-progress"];
+
+export type TaskStatus = (typeof STATUS_TYPES)[number];
 
 export interface TaskDoc extends BaseDoc {
   author: ObjectId;
@@ -102,6 +104,17 @@ export default class TaskingConcept {
   }
 
   /**
+   * Checks if a status is string is a valid task status.
+   *
+   * @param status a string input.
+   */
+  async assertValidStatus(status: string | undefined) {
+    if (status && !STATUS_TYPES.includes(status)) {
+      throw new InvalidStatusError(status);
+    }
+  }
+
+  /**
    * Checks if the task title and description are invalid.
    *
    * @param title the task's title.
@@ -122,6 +135,15 @@ export class TaskAuthorNotMatchError extends NotAllowedError {
     public readonly author: ObjectId,
     public readonly _id: ObjectId,
   ) {
-    super("{0} is not the author of task {1}!", author, _id);
+    super(`${author} is not the author of task ${_id}!`);
+  }
+}
+
+/**
+ * Error thrown when a status string is not a valid task status.
+ */
+export class InvalidStatusError extends NotAllowedError {
+  constructor(public readonly status: string) {
+    super(`${status} is not a valid task status.`);
   }
 }
