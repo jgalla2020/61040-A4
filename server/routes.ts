@@ -5,10 +5,10 @@ import { Router, getExpressRouter } from "./framework/router";
 import { Authing, Friending, Posting, Sessioning, Tasking } from "./app";
 import { PostOptions } from "./concepts/posting";
 import { SessionDoc } from "./concepts/sessioning";
+import { TaskStatus } from "./concepts/tasksetting";
 import Responses from "./responses";
 
 import { z } from "zod";
-import { TaskStatus } from "./concepts/tasksetting";
 
 /**
  * Web server routes for the app. Implements synchronizations between concepts.
@@ -154,10 +154,10 @@ class Routes {
     return await Friending.rejectRequest(fromOid, user);
   }
 
-  // Routes for the user's tasks
+  // Routes for the User's Tasks
 
   @Router.get("/tasks")
-  @Router.validate(z.object({ title: z.string().min(1), description: z.string().min(1) }))
+  @Router.validate(z.object({ author: z.string().optional() }))
   async getTasks(author?: string) {
     let tasks;
 
@@ -183,6 +183,9 @@ class Routes {
     const user = Sessioning.getUser(session);
     const oid = new ObjectId(id);
     await Tasking.assertAuthorIsUser(oid, user);
+
+    await Tasking.assertValidStatus(status);
+
     return await Tasking.update(oid, title, description, status);
   }
 
