@@ -2,7 +2,7 @@ import { ObjectId } from "mongodb";
 
 import { Router, getExpressRouter } from "./framework/router";
 
-import { Authing, Friending, Posting, Sessioning, Tasking } from "./app";
+import { Authing, Friending, Posting, Profiling, Sessioning, Tasking } from "./app";
 import { PostOptions } from "./concepts/posting";
 import { SessionDoc } from "./concepts/sessioning";
 import { TaskStatus } from "./concepts/tasksetting";
@@ -154,7 +154,7 @@ class Routes {
     return await Friending.rejectRequest(fromOid, user);
   }
 
-  // Routes for the User's Tasks
+  // Routes for creating, deleting, and updating user tasks
 
   @Router.get("/tasks")
   @Router.validate(z.object({ author: z.string().optional() }))
@@ -174,8 +174,7 @@ class Routes {
   @Router.post("/tasks")
   async createTask(session: SessionDoc, title: string, description: string) {
     const user = Sessioning.getUser(session);
-    const task = await Tasking.create(user, title, description);
-    return { msg: task.msg, task: await task.task };
+    return await Tasking.create(user, title, description);
   }
 
   @Router.patch("/tasks/:id")
@@ -195,6 +194,40 @@ class Routes {
     const oid = new ObjectId(id);
     await Tasking.assertAuthorIsUser(oid, user);
     return await Tasking.delete(oid);
+  }
+
+  // Routes for creating, deleting, and updating user profiles
+
+  @Router.get("/profile")
+  async getProfile(session: SessionDoc) {
+    const user = Sessioning.getUser(session);
+    await Profiling.assertProfileExists(user);
+
+    return await Profiling.viewProfile(user);
+  }
+
+  @Router.post("/profile")
+  async createProfile(session: SessionDoc, name: string, contact?: string, bio?: string) {
+    const user = Sessioning.getUser(session);
+    await Profiling.assertProfileDoesNotExist(user);
+
+    return await Profiling.create(user, name, contact, bio);
+  }
+
+  @Router.delete("/profile")
+  async deleteProfile(session: SessionDoc) {
+    const user = Sessioning.getUser(session);
+    await Profiling.assertProfileExists(user);
+
+    return await Profiling.delete(user);
+  }
+
+  @Router.patch("/profile")
+  async updateProfile(session: SessionDoc, name?: string, contact?: string, bio?: string) {
+    const user = Sessioning.getUser(session);
+    await Profiling.assertProfileExists(user);
+
+    return Profiling.update(user, name, contact, bio);
   }
 }
 
