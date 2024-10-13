@@ -2,10 +2,11 @@ import { ObjectId } from "mongodb";
 
 import { Router, getExpressRouter } from "./framework/router";
 
-import { Authing, Friending, Posting, Profiling, Sessioning, Tasking } from "./app";
+import { Authing, Friending, Posting, Profiling, Sessioning, Tasking, Tracking } from "./app";
 import { PostOptions } from "./concepts/posting";
 import { SessionDoc } from "./concepts/sessioning";
 import { TaskStatus } from "./concepts/tasksetting";
+import { GoalStatus } from "./concepts/tracking";
 import Responses from "./responses";
 
 import { z } from "zod";
@@ -157,13 +158,13 @@ class Routes {
   // Routes for creating, deleting, and updating user tasks
 
   @Router.get("/tasks")
-  @Router.validate(z.object({ author: z.string().optional() }))
-  async getTasks(author?: string) {
+  @Router.validate(z.object({ worker: z.string().optional() }))
+  async getTasks(worker?: string) {
     let tasks;
 
-    if (author) {
-      const id = (await Authing.getUserByUsername(author))._id;
-      tasks = await Tasking.getByAuthor(id);
+    if (worker) {
+      const id = (await Authing.getUserByUsername(worker))._id;
+      tasks = await Tasking.getByWorker(id);
     } else {
       tasks = await Tasking.getTasks();
     }
@@ -181,7 +182,7 @@ class Routes {
   async updateTask(session: SessionDoc, id: string, title?: string, description?: string, status?: TaskStatus) {
     const user = Sessioning.getUser(session);
     const oid = new ObjectId(id);
-    await Tasking.assertAuthorIsUser(oid, user);
+    await Tasking.assertWorkerIsUser(oid, user);
 
     await Tasking.assertValidStatus(status);
 
@@ -192,7 +193,7 @@ class Routes {
   async deleteTask(session: SessionDoc, id: string) {
     const user = Sessioning.getUser(session);
     const oid = new ObjectId(id);
-    await Tasking.assertAuthorIsUser(oid, user);
+    await Tasking.assertWorkerIsUser(oid, user);
     return await Tasking.delete(oid);
   }
 
@@ -227,7 +228,53 @@ class Routes {
     const user = Sessioning.getUser(session);
     await Profiling.assertProfileExists(user);
 
-    return Profiling.update(user, name, contact, bio);
+    return await Profiling.update(user, name, contact, bio);
+  }
+
+  // Routes for creating, deleting, and updating user goals
+  @Router.post("/goals")
+  async createGoal(session: SessionDoc, title: string, due: string, description?: string) {
+    const executor = Sessioning.getUser(session);
+
+    const parsedDueDate: Date = new Date(due);
+
+    return await Tracking.create(executor, title, parsedDueDate, description);
+  }
+
+  @Router.get("/goals/pending")
+  async getPending(session: SessionDoc) {
+    const executor = Sessioning.getUser(session);
+    return await Tracking.view(executor, "pending");
+  }
+
+  @Router.get("/goals/complete")
+  async getComplete(session: SessionDoc) {
+    const executor = Sessioning.getUser(session);
+    return await Tracking.view(executor, "complete");
+  }
+
+  @Router.get("/goals/pastdue")
+  async getPastDue(session: SessionDoc) {
+    const executor = Sessioning.getUser(session);
+    return await Tracking.view(executor, "past due");
+  }
+
+  @Router.patch("/goals/:id")
+  async updateGoal(session: SessionDoc, id: string, title?: string, description?: string, status?: GoalStatus, due?: string) {
+    const user = Sessioning.getUser(session);
+    const oid = new ObjectId(id);
+
+    await Tracking.assertExecutorIsUser(oid, user);
+
+    let parsedDueDate;
+
+    if (due) {
+      parsedDueDate = new Date(due);
+    } else {
+      parsedDueDate = (await Tracking.getGoal(oid))?.due;
+    }
+
+    return await Tracking.edit(oid, title, description, status, parsedDueDate);
   }
 }
 
