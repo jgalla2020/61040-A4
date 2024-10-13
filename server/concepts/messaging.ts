@@ -1,3 +1,4 @@
+import { strict as assert } from "assert";
 import { ObjectId } from "mongodb";
 import DocCollection, { BaseDoc } from "../framework/doc";
 import { NotAllowedError, NotFoundError } from "./errors";
@@ -12,9 +13,11 @@ export interface MessageDoc extends BaseDoc {
 
   sent?: boolean;
   timeSent?: Date;
+  receiverMessageID?: ObjectId;
 
   received?: boolean;
   timeReceived?: Date;
+  senderMessageID?: ObjectId;
 }
 
 /**
@@ -73,7 +76,7 @@ export default class MessagingConcept {
       throw new NotFoundError(`Message ${_id} does not exist.`);
     }
 
-    if (messageObj.sent) {
+    if (!messageObj.draft) {
       throw new NotADraftError(_id);
     }
 
@@ -86,22 +89,17 @@ export default class MessagingConcept {
   }
 
   /**
-   * Checks if some editor is the message sender. Throws an error if the
-   * editor is not the sender of the message.
+   * Delete a message draft.
    *
-   * @param _id the ID used to query the message object.
-   * @param editor the message editor.
+   * @param user the user attempting to delete the draft.
+   * @param _id the message _id.
+   * @returns a message draft deletion success message.
    */
-  async assertEditorIsSender(_id: ObjectId, editor: ObjectId) {
-    const message = await this.messages.readOne({ _id });
+  async deleteDraft(user: ObjectId, _id: ObjectId) {
+    await this.assertUserIsSender(user, _id);
 
-    if (!message) {
-      throw new NotFoundError("This message does not exist.");
-    }
-
-    if (message.from.toString() !== editor.toString()) {
-      throw new EditorNotMatchError(editor, _id);
-    }
+    await this.messages.deleteOne({ _id });
+    return { msg: "Message draft deleted successfully!" };
   }
 
   /**
@@ -139,11 +137,30 @@ export default class MessagingConcept {
       throw new NotADraftError(_id);
     }
 
-    // If so, update and create the message where appropriate
+    // If so, send the message
     const currentTime = new Date();
 
-    await this.messages.partialUpdateOne({ _id }, { sent: true, timeSent: currentTime, draft: undefined, timeDrafted: undefined });
-    await this.messages.createOne({ from: from, to: to, message: messageObj.message, received: true, timeReceived: currentTime });
+    const receiverMessageID = await this.messages.createOne({
+      from: from,
+      to: to,
+      message: messageObj.message,
+
+      received: true,
+      timeReceived: currentTime,
+      senderMessageID: _id,
+    });
+
+    await this.messages.partialUpdateOne(
+      { _id },
+      {
+        draft: undefined,
+        timeDrafted: undefined,
+
+        sent: true,
+        timeSent: currentTime,
+        receiverMessageID: receiverMessageID,
+      },
+    );
 
     return { msg: "Message sent successfully!", sentMessage: this.messages.readOne({ _id }) };
   }
@@ -171,44 +188,145 @@ export default class MessagingConcept {
   }
 
   /**
+   * Edit a sent message.
+   *
+   * @param _id the ID used to query the message.
+   * @param message the message text.
+   * @returns an object with a success message and the edited message draft.
+   */
+  async editSent(_id: ObjectId, message?: string) {
+    const messageObj = await this.messages.readOne({ _id });
+
+    if (!messageObj) {
+      throw new NotFoundError(`Message ${_id} does not exist.`);
+    }
+
+    if (!messageObj.sent) {
+      throw new MessageNotSentError(_id);
+    }
+
+    // Can only update the message text
+    const updatedMessage = message !== undefined ? message : messageObj.message;
+
+    // Need to update the message on the sender's end
+    await this.messages.partialUpdateOne({ _id }, { message: updatedMessage });
+
+    // And on the recipient's end
+    await this.messages.partialUpdateOne({ _id: messageObj.receiverMessageID }, { message: updatedMessage });
+
+    return { msg: "Message updated successfully!", editedDraft: await this.messages.readOne({ _id }) };
+  }
+
+  /**
+   * Delete a sent message.
+   *
+   * @param user the user attempting to delete the sent message.
+   * @param _id the message _id.
+   * @returns a sent message deletion success message.
+   */
+  async deleteSent(user: ObjectId, _id: ObjectId) {
+    await this.assertUserIsSender(user, _id);
+
+    const receiverMessageID = (await this.messages.readOne({ _id }))?.receiverMessageID;
+    assert(receiverMessageID, "There must be a receiver message if the message was sent.");
+
+    // Delete on the sender's end
+    await this.messages.deleteOne({ _id });
+
+    // And on the receiver's end
+    await this.messages.deleteOne({ receiverMessageID });
+
+    return { msg: "Sent message deleted successfully!" };
+  }
+
+  /**
    * Read a specific message.
    *
+   * @param user the user attempting to read the message.
    * @param _id the ID used to query the message.
    * @returns the message object corresponding to the ID.
    */
-  async read(_id: ObjectId) {
+  async read(user: ObjectId, _id: ObjectId) {
+    this.assertSenderOrReceiver(user, _id);
     return await this.messages.readOne({ _id });
   }
 
   /**
-   * Delete a specific message.
+   * Checks if some user is the message sender. Throws an error if the
+   * user is not the sender of the message.
    *
-   * @param _id the ID used to query the message.
-   * @returns
+   * @param user the message user.
+   * @param _id the ID used to query the message object.
    */
-  async delete(_id: ObjectId) {
-    await this.messages.deleteOne({ _id });
-    return { msg: "Message deleted successfully!" };
+  async assertUserIsSender(user: ObjectId, _id: ObjectId) {
+    const message = await this.messages.readOne({ _id });
+
+    if (!message) {
+      throw new NotFoundError("This message does not exist.");
+    }
+
+    if (message.from.toString() !== user.toString()) {
+      throw new UserNotSenderError(user, _id);
+    }
+  }
+
+  /**
+   * Checks if some user is the message sender or receiver. If not, throws an error.
+   *
+   * @param user the message user.
+   * @param _id the ID used to query the message object.
+   */
+  async assertSenderOrReceiver(user: ObjectId, _id: ObjectId) {
+    const message = await this.messages.readOne({ _id });
+
+    if (!message) {
+      throw new NotFoundError("This message does not exist.");
+    }
+
+    if (message.from.toString() !== user.toString() && message.to.toString() === user.toString()) {
+      throw new UserNotMatchError(user, _id);
+    }
   }
 }
 
 /**
- * Error thrown when an action is attempted on a message by an editor who is not the sender.
+ * Error thrown when an action is attempted on a message by a user who is not the sender.
  */
-export class EditorNotMatchError extends NotAllowedError {
+export class UserNotSenderError extends NotAllowedError {
   constructor(
-    public readonly editor: ObjectId,
+    public readonly user: ObjectId,
     public readonly _id: ObjectId,
   ) {
-    super(`${editor} is not the sender of message ${_id}!`);
+    super(`${user} is not the sender of message ${_id}!`);
   }
 }
 
 /**
- * Error thrown when attempting to edit a sent message.
+ * Error thrown when an action is attempted on a message by a user who is not a sender or receiver.
+ */
+export class UserNotMatchError extends NotAllowedError {
+  constructor(
+    public readonly user: ObjectId,
+    public readonly _id: ObjectId,
+  ) {
+    super(`${user} is not the sender or receiver of message ${_id}!`);
+  }
+}
+
+/**
+ * Error thrown when attempting to edit a non-drafted message.
  */
 export class NotADraftError extends NotAllowedError {
   constructor(public readonly _id: ObjectId) {
     super(`$The message ${_id} cannot be edited because it is not a draft!`);
+  }
+}
+
+/**
+ * Error thrown when attempting to edit a message not sent.
+ */
+export class MessageNotSentError extends NotAllowedError {
+  constructor(public readonly _id: ObjectId) {
+    super(`$The message ${_id} cannot be edited because it has been sent!`);
   }
 }
