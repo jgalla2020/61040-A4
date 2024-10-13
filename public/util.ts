@@ -111,9 +111,37 @@ const operations: Operation[] = [
     fields: { id: "input" },
   },
 
-  // Testing Tracking Routes
-
   // Testing Profile Routes
+
+  {
+    name: "Get Profile",
+    endpoint: "/api/profile",
+    method: "GET",
+    fields: {},
+  },
+
+  {
+    name: "Create Profile",
+    endpoint: "/api/profile",
+    method: "POST",
+    fields: { name: "input", contact: "input", bio: "textarea" },
+  },
+
+  {
+    name: "Delete Profile",
+    endpoint: "/api/profile",
+    method: "DELETE",
+    fields: {},
+  },
+
+  {
+    name: "Update Profile",
+    endpoint: "/api/profile",
+    method: "PATCH",
+    fields: { name: "input", contact: "input", bio: "textarea" },
+  },
+
+  // Testing Tracking Routes
 
   // Testing Sharing Routes
 
