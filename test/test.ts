@@ -83,7 +83,7 @@ describe("Creating, updating and deleting tasks", () => {
     assert(task);
 
     // Checking that the session user is the author
-    assert.deepStrictEqual(task.author, created.user._id, "The author must be the logged in user.");
+    assert.deepStrictEqual(task.worker, created.user._id, "The author must be the logged in user.");
 
     // Checking that task details are correct as created
     assert.strictEqual(task.title, title, "The task does not have the correct title.");
@@ -133,7 +133,7 @@ describe("Creating, updating and deleting tasks", () => {
     assert(newTask);
 
     // Checking that task details are correct as created
-    assert.deepStrictEqual(newTask.author, created.user._id, "The task author should not change.");
+    assert.deepStrictEqual(newTask.worker, created.user._id, "The task author should not change.");
     assert.deepStrictEqual(newTask.title, newTitle, `The title should have changed to ${newTitle} but it is ${newTask.title}.`);
     assert.deepStrictEqual(newTask.description, description, `The description should not have changed. It now is ${newTask.description}.`);
     assert.deepStrictEqual(newTask.status, "in-progress", `The status should not have changed. It now is ${newTask.status}.`);
@@ -162,13 +162,13 @@ describe("Creating, updating and deleting tasks", () => {
     const [output1, output2] = await app.getTasks("Mark");
 
     // Checking Output 1
-    assert.deepStrictEqual(output1.author, created1.user._id, `Incorrect author: ${output1.author}.`);
+    assert.deepStrictEqual(output1.worker, created1.user._id, `Incorrect author: ${output1.worker}.`);
     assert.deepStrictEqual(output1.title, title1, `Incorrect title: ${output1.title}.`);
     assert.deepStrictEqual(output1.description, description1, `Incorrect description: ${output1.description}.`);
     assert.deepStrictEqual(output1.status, "in-progress", `Incorrect status: ${output1.status}.`);
 
     // Checking Output2
-    assert.deepStrictEqual(output2.author, created1.user._id, `Incorrect author: ${output2.author}.`);
+    assert.deepStrictEqual(output2.worker, created1.user._id, `Incorrect author: ${output2.worker}.`);
     assert.deepStrictEqual(output2.title, title2, `Incorrect title: ${output2.title}.`);
     assert.deepStrictEqual(output2.description, description2, `Incorrect description: ${output2.description}.`);
     assert.deepStrictEqual(output2.status, "in-progress", `Incorrect status: ${output2.status}.`);

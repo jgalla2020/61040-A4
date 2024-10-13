@@ -232,6 +232,7 @@ class Routes {
   }
 
   // Routes for creating, deleting, and updating user goals
+
   @Router.post("/goals")
   async createGoal(session: SessionDoc, title: string, due: string, description?: string) {
     const executor = Sessioning.getUser(session);
