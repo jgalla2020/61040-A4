@@ -21,7 +21,7 @@ export default class TaskingConcept {
   public readonly tasks: DocCollection<TaskDoc>;
 
   /**
-   * Make an instance of Tasksetting.
+   * Make an instance of TasksettingConcept.
    *
    * @param collectionName the name of this collection of tasks.
    */
