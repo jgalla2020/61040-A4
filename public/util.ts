@@ -142,6 +142,40 @@ const operations: Operation[] = [
   },
 
   // Testing Tracking Routes
+  {
+    name: "Create Goal",
+    endpoint: "/api/goals",
+    method: "POST",
+    fields: { title: "input", due: "input", description: "textarea" },
+  },
+
+  {
+    name: "Get Pending Goals",
+    endpoint: "/api/goals/pending",
+    method: "GET",
+    fields: {},
+  },
+
+  {
+    name: "Get Complete Goals",
+    endpoint: "/api/goals/complete",
+    method: "GET",
+    fields: {},
+  },
+
+  {
+    name: "Get Past Due Goals",
+    endpoint: "/api/goals/pastdue",
+    method: "GET",
+    fields: {},
+  },
+
+  {
+    name: "Update Goal",
+    endpoint: "/api/goals/:id",
+    method: "PATCH",
+    fields: { id: "input", title: "input", description: "textarea", status: "input", due: "input" },
+  },
 
   // Testing Sharing Routes
 
