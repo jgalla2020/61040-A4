@@ -8,14 +8,14 @@ const STATUS_TYPES = ["complete", "in-progress"];
 export type TaskStatus = (typeof STATUS_TYPES)[number];
 
 export interface TaskDoc extends BaseDoc {
-  author: ObjectId;
+  worker: ObjectId;
   title: string;
   description: string;
   status: TaskStatus;
 }
 
 /**
- * concept: TaskSetting [Author]
+ * concept: TaskSetting [Worker]
  */
 export default class TaskingConcept {
   public readonly tasks: DocCollection<TaskDoc>;
@@ -32,14 +32,14 @@ export default class TaskingConcept {
   /**
    * Create a task with a title and description.
    *
-   * @param author the author of this task.
+   * @param worker the worker of this task.
    * @param title the task's title.
    * @param description the task's description.
    * @returns an object containing a success message and the task details.
    */
-  async create(author: ObjectId, title: string, description: string) {
+  async create(worker: ObjectId, title: string, description: string) {
     await this.assertValidTaskDetails(title, description);
-    const _id = await this.tasks.createOne({ author, title, description, status: "in-progress" });
+    const _id = await this.tasks.createOne({ worker, title, description, status: "in-progress" });
     return { msg: "Task created successfully!", task: await this.tasks.readOne({ _id }) };
   }
 
@@ -53,13 +53,13 @@ export default class TaskingConcept {
   }
 
   /**
-   * Get the tasks created by some author.
+   * Get the tasks created by some worker.
    *
-   * @param author the ObjectId used to query the task.
-   * @returns the tasks created by this author.
+   * @param worker the ObjectId used to query the task.
+   * @returns the tasks created by this worker.
    */
-  async getByAuthor(author: ObjectId) {
-    return await this.tasks.readMany({ author });
+  async getByWorker(worker: ObjectId) {
+    return await this.tasks.readMany({ worker });
   }
 
   /**
@@ -110,13 +110,13 @@ export default class TaskingConcept {
    * @param _id the ID identifying the task.
    * @param user the ID for the user.
    */
-  async assertAuthorIsUser(_id: ObjectId, user: ObjectId) {
+  async assertWorkerIsUser(_id: ObjectId, user: ObjectId) {
     const task = await this.tasks.readOne({ _id });
     if (!task) {
       throw new NotFoundError(`Task ${_id} does not exist!`);
     }
-    if (task.author.toString() !== user.toString()) {
-      throw new TaskAuthorNotMatchError(user, _id);
+    if (task.worker.toString() !== user.toString()) {
+      throw new TaskWorkerNotMatchError(user, _id);
     }
   }
 
@@ -145,14 +145,14 @@ export default class TaskingConcept {
 }
 
 /**
- * Error thrown when an action is attempted on a task by a user who is not the author.
+ * Error thrown when an action is attempted on a task by a user who is not the worker.
  */
-export class TaskAuthorNotMatchError extends NotAllowedError {
+export class TaskWorkerNotMatchError extends NotAllowedError {
   constructor(
-    public readonly author: ObjectId,
+    public readonly worker: ObjectId,
     public readonly _id: ObjectId,
   ) {
-    super(`${author} is not the author of task ${_id}!`);
+    super(`${worker} is not the worker of task ${_id}!`);
   }
 }
 
