@@ -381,7 +381,7 @@ class Routes {
     }
   }
 
-  // Routes for creating, editing, and deleting items
+  // Routes for creating, editing, and deleting preferences
 }
 
 /** The web app. */
