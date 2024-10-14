@@ -4,14 +4,14 @@ import DocCollection, { BaseDoc } from "../framework/doc";
 export type PreferenceLevel = "required" | "high" | "medium" | "low";
 
 export interface PreferenceDoc extends BaseDoc {
-  author: ObjectId;
+  user: ObjectId;
   title: string;
   description: string;
   level: PreferenceLevel;
 }
 
 /**
- * concept: Preferences
+ * concept: Preferences [User]
  */
 export default class PreferencesConcept {
   public readonly preferences: DocCollection<PreferenceDoc>;
