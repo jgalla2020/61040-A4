@@ -177,9 +177,57 @@ const operations: Operation[] = [
     fields: { id: "input", title: "input", description: "textarea", status: "input", due: "input" },
   },
 
-  // Testing Sharing Routes
-
   // Testing Messaging Routes
+  {
+    name: "Write Message Draft",
+    endpoint: "/api/messages",
+    method: "POST",
+    fields: { contactUser: "input", message: "textarea" },
+  },
+
+  {
+    name: "Read Drafts",
+    endpoint: "api/messages/drafts",
+    method: "GET",
+    fields: {},
+  },
+
+  {
+    name: "Read Sent Messages",
+    endpoint: "api/messages/sent",
+    method: "GET",
+    fields: { contactUser: "input" },
+  },
+
+  {
+    name: "Read Received Messages",
+    endpoint: "api/messages/received",
+    method: "GET",
+    fields: { contactUser: "input" },
+  },
+
+  {
+    name: "Send Message",
+    endpoint: "api/messages/send/:id",
+    method: "PATCH",
+    fields: { id: "input" },
+  },
+
+  {
+    name: "Edit Message",
+    endpoint: "api/messages",
+    method: "PATCH",
+    fields: { id: "input", contact: "input", message: "textarea" },
+  },
+
+  {
+    name: "Delete Message",
+    endpoint: "api/messages",
+    method: "DELETE",
+    fields: { id: "input" },
+  },
+
+  // Testing Sharing Routes
 
   // Testing Preferences Routes
 ];
