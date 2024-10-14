@@ -8,6 +8,8 @@ export interface MessageDoc extends BaseDoc {
   to: ObjectId;
   message: string;
 
+  attachment?: ObjectId;
+
   draft?: boolean;
   timeDrafted?: Date;
 
@@ -43,9 +45,9 @@ export default class MessagingConcept {
    * @param message the message text.
    * @returns an object containing a success message and the message draft.
    */
-  async draft(from: ObjectId, to: ObjectId, message: string) {
+  async draft(from: ObjectId, to: ObjectId, message: string, attachment?: ObjectId) {
     const time: Date = new Date();
-    const _id = await this.messages.createOne({ from: from, to: to, timeDrafted: time, message, draft: true });
+    const _id = await this.messages.createOne({ from: from, to: to, timeDrafted: time, message, draft: true, attachment });
 
     return { msg: "Message draft created successfully!", draft: await this.messages.readOne({ _id }) };
   }
@@ -65,19 +67,21 @@ export default class MessagingConcept {
    * Throws an error if the message does not exist or has already been sent.
    *
    * @param _id the ID used to query the message object.
-   * @param message the message text.
-   * @param to the recipient ID.
+   * @param message the updated message text (optional).
+   * @param to the updated recipient ID (optional).
+   * @param attachment the updated attachment (optional).
    * @returns an object with a success message and the edited message draft.
    */
-  async editDraft(_id: ObjectId, message?: string, to?: ObjectId) {
+  async editDraft(_id: ObjectId, message?: string, to?: ObjectId, attachment?: ObjectId) {
     const messageObj = await this.messages.readOne({ _id });
 
     assert(messageObj, `Message ${_id} does not exist.`);
 
     const updatedMessage = message !== undefined ? message : messageObj.message;
     const updatedContact = to !== undefined ? to : messageObj.to;
+    const updatedAttachment = attachment !== undefined ? attachment : messageObj.attachment;
 
-    await this.messages.partialUpdateOne({ _id }, { message: updatedMessage, to: updatedContact });
+    await this.messages.partialUpdateOne({ _id }, { message: updatedMessage, to: updatedContact, attachment: updatedAttachment });
 
     return { msg: "Message updated successfully!", editedDraft: await this.messages.readOne({ _id }) };
   }
@@ -109,9 +113,6 @@ export default class MessagingConcept {
     // Check if the message exists
     assert(messageObj, `Message ${_id} does not exist.`);
 
-    const messageFrom = messageObj.from;
-    const messageTo = messageObj.to;
-
     // If so, send the message
     const currentTime = new Date();
 
@@ -119,6 +120,8 @@ export default class MessagingConcept {
       from: from,
       to: to,
       message: messageObj.message,
+
+      attachment: messageObj.attachment,
 
       received: true,
       timeReceived: currentTime,
@@ -169,19 +172,20 @@ export default class MessagingConcept {
    * @param message the message text.
    * @returns an object with a success message and the edited message draft.
    */
-  async editSent(_id: ObjectId, message?: string) {
+  async editSent(_id: ObjectId, message?: string, attachment?: ObjectId) {
     const messageObj = await this.messages.readOne({ _id });
 
     assert(messageObj, `Message ${_id} does not exist.`);
 
-    // Can only update the message text
+    // Can only update the message text and attachment
     const updatedMessage = message !== undefined ? message : messageObj.message;
+    const updatedAttachment = attachment !== undefined ? attachment : messageObj.attachment;
 
     // Need to update the message on the sender's end
-    await this.messages.partialUpdateOne({ _id }, { message: updatedMessage });
+    await this.messages.partialUpdateOne({ _id }, { message: updatedMessage, attachment: updatedAttachment });
 
     // And on the recipient's end
-    await this.messages.partialUpdateOne({ _id: messageObj.receivedMessageID }, { message: updatedMessage });
+    await this.messages.partialUpdateOne({ _id: messageObj.receivedMessageID }, { message: updatedMessage, attachment: updatedAttachment });
 
     return { msg: "Message updated successfully!", editedDraft: await this.messages.readOne({ _id }) };
   }
