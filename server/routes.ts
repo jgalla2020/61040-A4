@@ -2,7 +2,7 @@ import { ObjectId } from "mongodb";
 
 import { Router, getExpressRouter } from "./framework/router";
 
-import { Authing, Friending, Posting, Profiling, Sessioning, Tasking, Tracking } from "./app";
+import { Authing, Friending, Messaging, Posting, Profiling, Sessioning, Tasking, Tracking } from "./app";
 import { PostOptions } from "./concepts/posting";
 import { SessionDoc } from "./concepts/sessioning";
 import { TaskStatus } from "./concepts/tasksetting";
@@ -10,6 +10,8 @@ import { GoalStatus } from "./concepts/tracking";
 import Responses from "./responses";
 
 import { z } from "zod";
+import { NotAllowedError, NotFoundError } from "./concepts/errors";
+import { NotADraftError } from "./concepts/messaging";
 
 /**
  * Web server routes for the app. Implements synchronizations between concepts.
@@ -245,19 +247,19 @@ class Routes {
   @Router.get("/goals/pending")
   async getPending(session: SessionDoc) {
     const executor = Sessioning.getUser(session);
-    return await Tracking.view(executor, "pending");
+    return await Tracking.viewStatus(executor, "pending");
   }
 
   @Router.get("/goals/complete")
   async getComplete(session: SessionDoc) {
     const executor = Sessioning.getUser(session);
-    return await Tracking.view(executor, "complete");
+    return await Tracking.viewStatus(executor, "complete");
   }
 
   @Router.get("/goals/pastdue")
   async getPastDue(session: SessionDoc) {
     const executor = Sessioning.getUser(session);
-    return await Tracking.view(executor, "past due");
+    return await Tracking.viewStatus(executor, "past due");
   }
 
   @Router.patch("/goals/:id")
@@ -272,10 +274,108 @@ class Routes {
     if (due) {
       parsedDueDate = new Date(due);
     } else {
-      parsedDueDate = (await Tracking.getGoal(oid))?.due;
+      parsedDueDate = (await Tracking.viewOneGoal(oid))?.due;
     }
 
     return await Tracking.edit(oid, title, description, status, parsedDueDate);
+  }
+
+  // Routes for creating, editing, sending, and unsending messages
+
+  @Router.post("/messages")
+  async writeMessage(session: SessionDoc, contactUser: string, message: string) {
+    const sender = Sessioning.getUser(session);
+    const contactID = (await Authing.getUserByUsername(contactUser))._id;
+
+    return await Messaging.draft(sender, contactID, message);
+  }
+
+  @Router.get("/messages/drafts")
+  async readDrafts(session: SessionDoc) {
+    const sender = Sessioning.getUser(session);
+
+    return await Messaging.readDrafts(sender);
+  }
+
+  @Router.get("/messages/sent")
+  async readSent(session: SessionDoc, contactUser: string) {
+    const sender = Sessioning.getUser(session);
+    const contactID = (await Authing.getUserByUsername(contactUser))._id;
+
+    return await Messaging.readSent(sender, contactID);
+  }
+
+  @Router.get("/messages/received")
+  async readReceived(session: SessionDoc, contactUser: string) {
+    const receiver = Sessioning.getUser(session);
+    const contactID = (await Authing.getUserByUsername(contactUser))._id;
+
+    return await Messaging.readReceived(receiver, contactID);
+  }
+
+  @Router.patch("/messages/send/:id")
+  async sendMessage(session: SessionDoc, id: string) {
+    const userID = Sessioning.getUser(session);
+    const messageID = await new ObjectId(id);
+
+    const messageObj = await Messaging.read(userID, messageID);
+
+    if (!messageObj) throw new NotAllowedError(`Message with id ${id} does not exist.`);
+
+    await Messaging.assertUserIsSender(userID, messageID);
+
+    if (!messageObj.draft) throw new NotADraftError(messageID);
+
+    return await Messaging.send(messageID, userID, messageObj.to);
+  }
+
+  @Router.patch("/messages")
+  async editMessage(session: SessionDoc, id: string, contact?: string, message?: string) {
+    const userID = Sessioning.getUser(session);
+    const messageID = new ObjectId(id);
+
+    const messageObj = await Messaging.read(userID, messageID);
+
+    if (!messageObj) {
+      throw new NotFoundError(`Message with ID ${id} does not exist.`);
+    }
+
+    await Messaging.assertUserIsSender(userID, messageID);
+
+    const isSent = messageObj.sent;
+
+    if (isSent && contact) {
+      throw new NotAllowedError(`Cannot edit the contact of a sent message.`);
+    } else if (isSent) {
+      return await Messaging.editSent(messageID, message);
+    } else {
+      const contactID = new ObjectId(contact);
+      return await Messaging.editDraft(messageID, message, contactID);
+    }
+  }
+
+  @Router.delete("/messages")
+  async deleteMessage(session: SessionDoc, id: string) {
+    const userID = Sessioning.getUser(session);
+    const messageID = new ObjectId(id);
+
+    await Messaging.assertSenderOrReceiver(userID, messageID);
+
+    const messageObj = await Messaging.read(userID, messageID);
+
+    if (!messageObj) {
+      throw new NotFoundError(`Message with ID ${id} does not exist.`);
+    }
+
+    await Messaging.assertUserIsSender(userID, messageID);
+
+    const isSent = messageObj.sent;
+
+    if (isSent) {
+      return await Messaging.deleteSent(userID, messageID);
+    } else {
+      return await Messaging.deleteDraft(userID, messageID);
+    }
   }
 }
 
