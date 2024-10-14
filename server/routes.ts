@@ -2,10 +2,10 @@ import { ObjectId } from "mongodb";
 
 import { Router, getExpressRouter } from "./framework/router";
 
-import { Authing, Friending, Messaging, Posting, Profiling, Sessioning, Tasking, Tracking } from "./app";
+import { Authing, Friending, Itemizing, Messaging, Posting, Profiling, Sessioning, Tracking } from "./app";
+import { ItemStatus } from "./concepts/itemizing";
 import { PostOptions } from "./concepts/posting";
 import { SessionDoc } from "./concepts/sessioning";
-import { TaskStatus } from "./concepts/tasksetting";
 import { GoalStatus } from "./concepts/tracking";
 import Responses from "./responses";
 
@@ -166,9 +166,9 @@ class Routes {
 
     if (worker) {
       const id = (await Authing.getUserByUsername(worker))._id;
-      tasks = await Tasking.getByWorker(id);
+      tasks = await Itemizing.getByCreator(id);
     } else {
-      tasks = await Tasking.getTasks();
+      tasks = await Itemizing.getItems();
     }
 
     return tasks;
@@ -177,26 +177,29 @@ class Routes {
   @Router.post("/tasks")
   async createTask(session: SessionDoc, title: string, description: string) {
     const user = Sessioning.getUser(session);
-    return await Tasking.create(user, title, description);
+
+    await Itemizing.assertValidItemDetails(title, description);
+
+    return await Itemizing.create(user, title, description, "in-progress");
   }
 
   @Router.patch("/tasks/:id")
-  async updateTask(session: SessionDoc, id: string, title?: string, description?: string, status?: TaskStatus) {
+  async updateTask(session: SessionDoc, id: string, title?: string, description?: string, status?: ItemStatus) {
     const user = Sessioning.getUser(session);
     const oid = new ObjectId(id);
-    await Tasking.assertWorkerIsUser(oid, user);
+    await Itemizing.assertCreatorIsUser(oid, user);
 
-    await Tasking.assertValidStatus(status);
+    await Itemizing.assertValidStatus(status);
 
-    return await Tasking.update(oid, title, description, status);
+    return await Itemizing.update(oid, title, description, status);
   }
 
   @Router.delete("/tasks/:id")
   async deleteTask(session: SessionDoc, id: string) {
     const user = Sessioning.getUser(session);
     const oid = new ObjectId(id);
-    await Tasking.assertWorkerIsUser(oid, user);
-    return await Tasking.delete(oid);
+    await Itemizing.assertCreatorIsUser(oid, user);
+    return await Itemizing.delete(oid);
   }
 
   // Routes for creating, deleting, and updating user profiles
@@ -377,6 +380,8 @@ class Routes {
       return await Messaging.deleteDraft(userID, messageID);
     }
   }
+
+  // Routes for creating, editing, and deleting items
 }
 
 /** The web app. */
