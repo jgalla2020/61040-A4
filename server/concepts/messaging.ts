@@ -13,11 +13,11 @@ export interface MessageDoc extends BaseDoc {
 
   sent?: boolean;
   timeSent?: Date;
-  receiverMessageID?: ObjectId;
+  receivedMessageID?: ObjectId;
 
   received?: boolean;
   timeReceived?: Date;
-  senderMessageID?: ObjectId;
+  sentMessageID?: ObjectId;
 }
 
 /**
@@ -72,13 +72,7 @@ export default class MessagingConcept {
   async editDraft(_id: ObjectId, message?: string, to?: ObjectId) {
     const messageObj = await this.messages.readOne({ _id });
 
-    if (!messageObj) {
-      throw new NotFoundError(`Message ${_id} does not exist.`);
-    }
-
-    if (!messageObj.draft) {
-      throw new NotADraftError(_id);
-    }
+    assert(messageObj, `Message ${_id} does not exist.`);
 
     const updatedMessage = message !== undefined ? message : messageObj.message;
     const updatedContact = to !== undefined ? to : messageObj.to;
@@ -96,8 +90,6 @@ export default class MessagingConcept {
    * @returns a message draft deletion success message.
    */
   async deleteDraft(user: ObjectId, _id: ObjectId) {
-    await this.assertUserIsSender(user, _id);
-
     await this.messages.deleteOne({ _id });
     return { msg: "Message draft deleted successfully!" };
   }
@@ -115,39 +107,22 @@ export default class MessagingConcept {
     const messageObj = await this.messages.readOne({ _id });
 
     // Check if the message exists
-    if (!messageObj) {
-      throw new NotFoundError(`Message ${_id} does not exist.`);
-    }
+    assert(messageObj, `Message ${_id} does not exist.`);
 
     const messageFrom = messageObj.from;
     const messageTo = messageObj.to;
 
-    // Check if the message was created by the sender
-    if (messageFrom.toString() !== from.toString()) {
-      throw new NotAllowedError(`This message was not drafted by sender ${from}.`);
-    }
-
-    // Check if the message is addressed to the recipient
-    if (messageTo.toString() !== to.toString()) {
-      throw new NotAllowedError(`This message is not addressed to contact ${to}.`);
-    }
-
-    // Check if the message is a draft
-    if (messageObj.draft !== undefined && !messageObj.draft) {
-      throw new NotADraftError(_id);
-    }
-
     // If so, send the message
     const currentTime = new Date();
 
-    const receiverMessageID = await this.messages.createOne({
+    const receivedMessageID = await this.messages.createOne({
       from: from,
       to: to,
       message: messageObj.message,
 
       received: true,
       timeReceived: currentTime,
-      senderMessageID: _id,
+      sentMessageID: _id,
     });
 
     await this.messages.partialUpdateOne(
@@ -158,11 +133,11 @@ export default class MessagingConcept {
 
         sent: true,
         timeSent: currentTime,
-        receiverMessageID: receiverMessageID,
+        receivedMessageID: receivedMessageID,
       },
     );
 
-    return { msg: "Message sent successfully!", sentMessage: this.messages.readOne({ _id }) };
+    return { msg: "Message sent successfully!", sentMessage: await this.messages.readOne({ _id }) };
   }
 
   /**
@@ -183,7 +158,7 @@ export default class MessagingConcept {
    * @param to the message recipient.
    * @returns the messages received by the sender.
    */
-  async readReceived(from: ObjectId, to: ObjectId) {
+  async readReceived(to: ObjectId, from: ObjectId) {
     return await this.messages.readMany({ from: from, to: to, received: true });
   }
 
@@ -197,13 +172,7 @@ export default class MessagingConcept {
   async editSent(_id: ObjectId, message?: string) {
     const messageObj = await this.messages.readOne({ _id });
 
-    if (!messageObj) {
-      throw new NotFoundError(`Message ${_id} does not exist.`);
-    }
-
-    if (!messageObj.sent) {
-      throw new MessageNotSentError(_id);
-    }
+    assert(messageObj, `Message ${_id} does not exist.`);
 
     // Can only update the message text
     const updatedMessage = message !== undefined ? message : messageObj.message;
@@ -212,7 +181,7 @@ export default class MessagingConcept {
     await this.messages.partialUpdateOne({ _id }, { message: updatedMessage });
 
     // And on the recipient's end
-    await this.messages.partialUpdateOne({ _id: messageObj.receiverMessageID }, { message: updatedMessage });
+    await this.messages.partialUpdateOne({ _id: messageObj.receivedMessageID }, { message: updatedMessage });
 
     return { msg: "Message updated successfully!", editedDraft: await this.messages.readOne({ _id }) };
   }
@@ -227,14 +196,14 @@ export default class MessagingConcept {
   async deleteSent(user: ObjectId, _id: ObjectId) {
     await this.assertUserIsSender(user, _id);
 
-    const receiverMessageID = (await this.messages.readOne({ _id }))?.receiverMessageID;
+    const receiverMessageID = (await this.messages.readOne({ _id }))?.receivedMessageID;
     assert(receiverMessageID, "There must be a receiver message if the message was sent.");
 
     // Delete on the sender's end
     await this.messages.deleteOne({ _id });
 
     // And on the receiver's end
-    await this.messages.deleteOne({ receiverMessageID });
+    await this.messages.deleteOne({ receivedMessageID: receiverMessageID });
 
     return { msg: "Sent message deleted successfully!" };
   }
@@ -247,7 +216,6 @@ export default class MessagingConcept {
    * @returns the message object corresponding to the ID.
    */
   async read(user: ObjectId, _id: ObjectId) {
-    this.assertSenderOrReceiver(user, _id);
     return await this.messages.readOne({ _id });
   }
 
@@ -318,7 +286,7 @@ export class UserNotMatchError extends NotAllowedError {
  */
 export class NotADraftError extends NotAllowedError {
   constructor(public readonly _id: ObjectId) {
-    super(`$The message ${_id} cannot be edited because it is not a draft!`);
+    super(`$The message ${_id} is not a draft!`);
   }
 }
 
